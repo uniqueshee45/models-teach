@@ -1,0 +1,8 @@
+// Cloudflare: serve the built game as static files (Workers Builds: build `npm run build`, deploy `npx wrangler deploy`)
+{
+  "name": "models-teach",
+  "compatibility_date": "2026-10-14",
+  "assets": {
+    "directory": "./game/dist"
+  }
+}
