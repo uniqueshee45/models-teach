@@ -1,0 +1,13 @@
+{
+  "name": "pick-your-model",
+  "private": true,
+  "scripts": {
+    "build": "node game/build.cjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "three": "^0.171.0"
+  }
+}
