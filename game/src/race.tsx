@@ -16,8 +16,13 @@ import {KINDS, MODELS} from './stats';
 import type {ModelId} from './stats';
 import {loop, sfx} from './sound';
 
+/** A phone or tablet: every action needs something to tap, and the keyboard hints are noise. */
+export const TOUCH = matchMedia('(pointer: coarse)').matches;
 export const W = 1920, H = 1080;
-const CW = 1600, CH = 900;          // the canvas draws at this size and is stretched to the stage
+/** Every 3D world's canvas draws at this size and is stretched to the stage; a phone draws 36% fewer pixels. */
+export const CW = TOUCH ? 1280 : 1600, CH = TOUCH ? 720 : 900;
+/** How to brake, in the words of the device you hold. */
+const HOLD = TOUCH ? 'HOLD THE SCREEN' : 'HOLD ↓';
 const GO_T = 2.4;                   // countdown: three red lamps, then green
 const END_HOLD = 2.8;               // seconds between the end of your run and the results card
 const TIP_S = 4.5;                  // seconds a tip stays up
@@ -54,13 +59,12 @@ function makeSpec(r: Road, plan: Plan): Layout {
 
 /* ---------- HUD kit (the video's mobile-racing chrome) ---------- */
 export const GLASS: React.CSSProperties = {background: 'rgba(10,16,38,.62)', border: '2px solid rgba(255,255,255,.16)', borderRadius: 22,
-  boxShadow: '0 10px 30px rgba(0,0,0,.25)', backdropFilter: 'blur(6px)'};
+  // ponytail: no blur on a phone; it re-blurs the moving 3D world under every panel, every frame
+  boxShadow: '0 10px 30px rgba(0,0,0,.25)', ...(TOUCH ? {} : {backdropFilter: 'blur(6px)'})};
 export const GameText: React.FC<{text: string; size: number; from?: string; to?: string}> = ({text, size, from = '#fff6a8', to = '#ff9a1f'}) =>
   <div style={{fontFamily: BOLD, fontSize: size, fontStyle: 'italic', lineHeight: 1.1, whiteSpace: 'nowrap', filter: `drop-shadow(0 ${size * .07}px 0 rgba(10,16,38,.55))`}}>
     <span style={{background: `linear-gradient(180deg, ${from} 15%, ${to} 85%)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
       WebkitTextStroke: `${Math.max(3, size * .075)}px #1b2440`, paintOrder: 'stroke fill', padding: `0 ${size * .12}px`}}>{text}</span></div>;
-/** A phone or tablet: every action needs something to tap, and the keyboard hints are noise. */
-export const TOUCH = matchMedia('(pointer: coarse)').matches;
 /** A button to tap or click. `k` is its key, shown only where there is a keyboard. */
 export const Btn: React.FC<{label: string; k?: string; act: () => void; main?: boolean; size?: number; style?: React.CSSProperties}> = ({label, k, act, main, size = 26, style}) =>
   <div data-ui="btn" onClick={e => {e.stopPropagation(); act();}} style={{display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: size * .5, height: size * 2.9, padding: `0 ${size * 1.2}px`,
@@ -77,7 +81,7 @@ type Pop = {text: string; sub?: string; from: string; to: string; t0: number; du
 type Rival = {id: ModelId; s: Sim; flash: number};
 type Game = {
   phase: 'count' | 'race' | 'end'; clock: number; tEnd: number;
-  you: Sim; rivals: Rival[]; lane: number; nitroHeld: boolean; brakeHeld: boolean; auto: Style | null; nitroVis: number; pitVis: number; pitT: number;
+  you: Sim; rivals: Rival[]; lane: number; nitroHeld: boolean; brakeHeld: boolean; touchBrake: boolean; auto: Style | null; nitroVis: number; pitVis: number; pitT: number;
   shake: number; hurt: number; beams: number[]; pops: Pop[]; face: Face; faceT: number;
   tip: {text: string; t0: number} | null; tips: string[]; told: Set<string>;
   coins: ({t0: number; x: number; d: number} | undefined)[]; coinN: number;
@@ -95,7 +99,7 @@ export const Race: React.FC<{road: Road; pick: ModelId; rivals: ModelId[]; onEnd
     const seed = 1 + Math.floor(Math.random() * 1e6);   // the same questions for every car in this race, new ones next race
     const g: Game = {phase: 'count', clock: 0, tEnd: 0, you: makeSim(pick, road, seed),
       rivals: rivals.map(id => ({id, s: makeSim(id, road, seed), flash: 0})),
-      lane: 0, nitroHeld: false, brakeHeld: false, auto: null, nitroVis: 0, pitVis: 0, pitT: 0, shake: 0, hurt: 0, beams: [], pops: [], face: 'happy', faceT: 0,
+      lane: 0, nitroHeld: false, brakeHeld: false, touchBrake: false, auto: null, nitroVis: 0, pitVis: 0, pitT: 0, shake: 0, hurt: 0, beams: [], pops: [], face: 'happy', faceT: 0,
       tip: null, tips: [], told: new Set(), coins: Array(COINS), coinN: 0};
     const lay = makeSpec(road, g.you.plan);
     const rig = build(canvas.current!, lay.spec, CW, CH, {
@@ -114,7 +118,7 @@ export const Race: React.FC<{road: Road; pick: ModelId; rivals: ModelId[]; onEnd
         case 'pit': g.beams.push(g.clock); g.pitT = 0; sfx('blip', .25); feel('side', 9); break;
         case 'go': sfx('whoosh', .3); feel('happy', 1); pop({text: 'GO!', from: '#b8ff9a', to: '#2ecc71', dur: .7, y: 330, size: k ? 120 : 200});
           tip('drive', road.id === 'inbox' ? 'EASY EMAILS: ITS CALLS ARE ALL RIGHT HERE. FOLLOW THE LIGHT, FLAT OUT.'
-            : 'IT CALLS A LANE BEFORE EVERY FORK. TRUST THE LIGHT, OR HOLD ↓ TO SLOW DOWN AND SEE THE WALLS FIRST.'); break;
+            : `IT CALLS A LANE BEFORE EVERY FORK. TRUST THE LIGHT, OR ${HOLD} TO SLOW DOWN AND SEE THE WALLS FIRST.`); break;
         case 'right': sfx('ding', .25); feel('happy', .6);
           if (you.streak >= 5 && you.streak % 5 === 0) pop({text: `×${you.streak} CLEAN`, from: '#eaffd8', to: '#37e0c8', dur: .8, y: 500, size: 70}); break;
         case 'caught': {sfx('zap', .4); feel('happy', 1);
@@ -151,7 +155,7 @@ export const Race: React.FC<{road: Road; pick: ModelId; rivals: ModelId[]; onEnd
         r.flash = Math.max(0, r.flash - DT);
       }
       if (g.phase === 'end') {if (g.clock - g.tEnd > END_HOLD) finishRace(); return;}
-      const inp: Input = g.auto ? botInput(you, g.auto, g.nitroHeld) : {lane: g.lane, brake: g.brakeHeld, nitro: g.nitroHeld};
+      const inp: Input = g.auto ? botInput(you, g.auto, g.nitroHeld) : {lane: g.lane, brake: g.brakeHeld || g.touchBrake, nitro: g.nitroHeld};
       g.lane = inp.lane;
       const wasNitro = you.nitro, spent0 = you.spent;
       for (const e of tick(you, inp)) onEv(e);
@@ -160,7 +164,7 @@ export const Race: React.FC<{road: Road; pick: ModelId; rivals: ModelId[]; onEnd
       const slice = road.budget / 40;
       if (Math.floor(you.spent / slice) > Math.floor(spent0 / slice)) g.coins[g.coinN++ % COINS] = {t0: g.clock, x: you.x * LANE, d: you.d};
       if (you.k < n && you.plan.calls[you.k] === 'ask' && you.phase === 'drive' && wallD(road, you.k) - you.d < 100)
-        tip('ask', '"NOT SURE": NO LIGHT. IT ADMITS IT DOESN\'T KNOW. HOLD ↓ AND FIND THE GAP YOURSELF.');
+        tip('ask', `"NOT SURE": NO LIGHT. IT ADMITS IT DOESN'T KNOW. ${HOLD} AND FIND THE GAP YOURSELF.`);
     };
     const finishRace = () => {
       if (g.phase !== 'end' || !ref.current) return;
@@ -179,11 +183,25 @@ export const Race: React.FC<{road: Road; pick: ModelId; rivals: ModelId[]; onEnd
       if (k === 'escape') quit.current();
     };
     const kd = (e: KeyboardEvent) => key(e, true), ku = (e: KeyboardEvent) => key(e, false);
-    const tap = (e: PointerEvent) => {
+    // A quick tap on either half changes lane when the finger lifts; a finger held down brakes, so one thumb can
+    // brake while the other steers. A held finger changes no lane.
+    const HOLD_MS = 180, downs = new Map<number, {x: number; held: boolean; timer: number}>();
+    const touchBrake = () => {g.touchBrake = [...downs.values()].some(d => d.held);};
+    const press = (e: PointerEvent) => {
       if ((e.target as HTMLElement).closest('[data-ui]')) return;
-      g.lane = e.clientX < innerWidth / 2 ? Math.max(-1, g.lane - 1) : Math.min(1, g.lane + 1);
+      const d = {x: e.clientX, held: false, timer: 0};
+      d.timer = window.setTimeout(() => {d.held = true; touchBrake();}, HOLD_MS);
+      downs.set(e.pointerId, d);
     };
-    addEventListener('keydown', kd); addEventListener('keyup', ku); addEventListener('pointerdown', tap);
+    const release = (e: PointerEvent) => {
+      const d = downs.get(e.pointerId);
+      if (!d) return;
+      clearTimeout(d.timer); downs.delete(e.pointerId);
+      if (!d.held && e.type === 'pointerup') g.lane = d.x < innerWidth / 2 ? Math.max(-1, g.lane - 1) : Math.min(1, g.lane + 1);
+      touchBrake();
+    };
+    addEventListener('keydown', kd); addEventListener('keyup', ku);
+    addEventListener('pointerdown', press); addEventListener('pointerup', release); addEventListener('pointercancel', release);
 
     const draw = () => {rig.render(stateOf(g, road, m.body, lay)); setTick(t => t + 1);};
     rig.warm(); draw();   // pay for every shader and texture now, before the countdown, then put the real first frame on top
@@ -216,7 +234,9 @@ export const Race: React.FC<{road: Road; pick: ModelId; rivals: ModelId[]; onEnd
     return () => {
       removeEventListener('keyup', hook);
       cancelAnimationFrame(raf); ref.current = null;
-      removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('pointerdown', tap);
+      removeEventListener('keydown', kd); removeEventListener('keyup', ku);
+      removeEventListener('pointerdown', press); removeEventListener('pointerup', release); removeEventListener('pointercancel', release);
+      for (const d of downs.values()) clearTimeout(d.timer);
       loop('engine.wav', 0); loop('bed-race.mp3', 0);
       canvas.current?.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
     };
@@ -225,7 +245,7 @@ export const Race: React.FC<{road: Road; pick: ModelId; rivals: ModelId[]; onEnd
   const cur = ref.current;
   return <div style={{position: 'absolute', inset: 0, overflow: 'hidden', background: '#9fd0ff'}}>
     <canvas ref={canvas} width={CW} height={CH} style={{position: 'absolute', inset: 0, width: W, height: H}}/>
-    {cur && <Hud g={cur.g} road={road} rig={cur.rig} pick={pick} setNitro={v => {cur.g.nitroHeld = v;}} setBrake={v => {cur.g.brakeHeld = v;}} quit={onQuit}/>}
+    {cur && <Hud g={cur.g} road={road} rig={cur.rig} pick={pick} setNitro={v => {cur.g.nitroHeld = v;}} quit={onQuit}/>}
   </div>;
 };
 
@@ -308,7 +328,7 @@ function crewPx(pose: Pose): Grid {
 const v3 = new THREE.Vector3();
 export const Mono: React.FC<{size: number; color?: string; children: React.ReactNode; style?: React.CSSProperties}> = ({size, color = '#fff', children, style}) =>
   <div style={{fontFamily: MONO, fontSize: size, color, ...style}}>{children}</div>;
-const Hud: React.FC<{g: Game; road: Road; rig: Rig; pick: ModelId; setNitro: (v: boolean) => void; setBrake: (v: boolean) => void; quit: () => void}> = ({g, road: r, rig, pick, setNitro, setBrake, quit}) => {
+const Hud: React.FC<{g: Game; road: Road; rig: Rig; pick: ModelId; setNitro: (v: boolean) => void; quit: () => void}> = ({g, road: r, rig, pick, setNitro, quit}) => {
   const m = MODELS[pick], s = g.you, p = s.plan, len = lenOf(r), n = s.n, top = topOf(r, m);
   const project = (q: V3) => {v3.set(...q).project(rig.camera); return {x: (v3.x + 1) / 2 * W, y: (1 - v3.y) / 2 * H, ok: v3.z < 1};};
   const pd = s.d, x = s.x * LANE, t = g.clock;
@@ -339,7 +359,7 @@ const Hud: React.FC<{g: Game; road: Road; rig: Rig; pick: ModelId; setNitro: (v:
   // the bubble over the car: the pit clock, or what the co-driver says about the fork ahead
   const k = s.k, glyph = (kk: number) => p.lit[kk] === null ? '?' : r.id === 'inbox' ? ARROW[p.lit[kk]! + 1] : `${ARROW[p.lit[kk]! + 1]} ${LETTERS[p.lit[kk]! + 1]}`;
   const bubble = !racing ? null
-    : s.phase === 'drive' && k < n && k < calledUpTo(s) ? (p.lit[k] === null ? {head: '"NOT SURE"', sub: 'HOLD ↓ AND LOOK', c: '#8fd3ff'} : {head: `IT SAYS ${glyph(k)}`, sub: s.braking ? 'BRAKING · LOOKING' : r.id === 'tickets' ? `${tagOf(p, k)} · IT GETS ${Math.round(m.code.by[p.kind[k]])}%` : `${LEVEL[p.hard[k]]} ${r.unit}`, c: p.hard[k] === 3 ? '#ffb13b' : '#fff'})
+    : s.phase === 'drive' && k < n && k < calledUpTo(s) ? (p.lit[k] === null ? {head: '"NOT SURE"', sub: `${HOLD} AND LOOK`, c: '#8fd3ff'} : {head: `IT SAYS ${glyph(k)}`, sub: s.braking ? 'BRAKING · LOOKING' : r.id === 'tickets' ? `${tagOf(p, k)} · IT GETS ${Math.round(m.code.by[p.kind[k]])}%` : `${LEVEL[p.hard[k]]} ${r.unit}`, c: p.hard[k] === 3 ? '#ffb13b' : '#fff'})
     : null;
   const seen = p.calls.slice(0, k), tally = (c: string) => seen.filter(v => v === c).length, [a, b, c] = counts(r, m);
   // the notes: this stint's calls, in order
@@ -453,14 +473,10 @@ const Hud: React.FC<{g: Game; road: Road; rig: Rig; pick: ModelId; setNitro: (v:
         <div style={{fontFamily: BOLD, fontStyle: 'italic', fontSize: 30, color: '#fff', lineHeight: 1.05}}>FAST<br/>MODE</div>
         <Mono size={15} color="#e8f6ff" style={{marginTop: 4}}>×{m.fast.k} · ${m.fast.outP}/M</Mono></div>
       <Mono size={16} style={{marginTop: 6, textShadow: '0 2px 4px rgba(0,0,0,.6)'}}>{TOUCH ? 'HOLD' : 'HOLD SPACE'}</Mono></div>}
-    {/* the brake, for a touch screen */}
-    <div data-ui="brake" onPointerDown={e => {e.preventDefault(); setBrake(true);}} onPointerUp={() => setBrake(false)} onPointerLeave={() => setBrake(false)}
-      style={{position: 'absolute', left: 40, bottom: 84, width: 250, textAlign: 'center', cursor: 'pointer', touchAction: 'none', padding: '14px 0', ...GLASS,
-        borderColor: s.braking ? '#ffb13b' : undefined, background: s.braking ? 'rgba(255,177,59,.45)' : GLASS.background}}>
-      <div style={{fontFamily: BOLD, fontStyle: 'italic', fontSize: 32, color: '#fff'}}>BRAKE ↓</div>
-      <Mono size={15} color="#e8eefc">SLOW DOWN TO SEE THE WALLS</Mono></div>
-    <Mono size={19} style={{position: 'absolute', left: 40, bottom: 34, textShadow: '0 2px 5px rgba(0,0,0,.7)', lineHeight: 1.6}}>
-      {TOUCH ? 'TAP THE LEFT OR RIGHT SIDE TO CHANGE LANE' : `← →  LANE   ↓  BRAKE${m.fast ? '   SPACE  FAST MODE' : ''}   ESC  QUIT`}</Mono>
+    {/* how to drive; on a phone, big enough to read at a third of the size */}
+    <Mono size={TOUCH ? 26 : 19} style={{position: 'absolute', left: 40, bottom: 34, textShadow: '0 2px 5px rgba(0,0,0,.7)', lineHeight: 1.4}}>
+      {TOUCH ? <>TAP LEFT OR RIGHT: CHANGE LANE<br/><span style={{color: s.braking ? '#ffb13b' : undefined}}>HOLD ANYWHERE: BRAKE</span></>
+        : `← →  LANE   ↓  BRAKE${m.fast ? '   SPACE  FAST MODE' : ''}   ESC  QUIT`}</Mono>
     <Btn label="✕ QUIT" size={20} act={quit} style={{position: 'absolute', right: 40, top: 236}}/>
     {/* pops */}
     {g.pops.filter(q => t - q.t0 < q.dur).map((q, i) => {const u = t - q.t0, o = clamp(u / .08) * clamp((q.dur - u) / .25);

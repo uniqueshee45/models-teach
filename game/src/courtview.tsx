@@ -20,7 +20,7 @@ import {BOLD, MONO, clamp, lerp, outC} from '../../remotion/src/meb-hatch/rig';
 import {Tx} from '../../remotion/src/opus55/pixkit';
 import {Lawyer, Owl, Shout as Bubble} from './courtkit';
 import type {OwlFace} from './courtkit';
-import {Btn, H, TOUCH, W} from './race';
+import {Btn, CH, CW, H, TOUCH, W} from './race';
 import {Button, GOLD, Hit, INK, Icon, Keys, MUTE, Proof, Sheet, Star, Stars, TAP, UI, WORLD_BLUR, cap, outline, txt} from './ui';
 import {DT, rng} from './rules';
 import {BY, CASES, GOALS, MARKS, POST, STAMPS, botStep, leftOf, live, makeTrial, moveAt, newIn, pick, rest, shout, stars, tipOf} from './court';
@@ -30,7 +30,6 @@ import {ANIM, Count, Explain, In, Moves, markSeen, seen, useT} from './explain';
 import type {Card} from './explain';
 
 /* ---------- the set: the film's own shots, with the middle of the picture moved left to clear the record ---------- */
-const CW = 1600, CH = 900;   // the canvas draws at this size and is stretched to the stage
 const OFF = 320;             // the record covers the right third, so the scene's middle sits at x = 640
 type Cam = {pos: V3; look: V3; fov: number};
 const SHOTS: Record<'wit' | 'def' | 'judge' | 'wide', Cam> = {

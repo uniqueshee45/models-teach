@@ -11,7 +11,7 @@ import type {Bit, Blk as Cube, Rig, V3} from '../../remotion/src/opus55/blocks3d
 import {Txt} from '../../remotion/src/opus55/chrome';
 import {BOLD, MONO, clamp, lerp, meb, outBack} from '../../remotion/src/meb-hatch/rig';
 import type {Pose} from '../../remotion/src/meb-hatch/rig';
-import {Btn, GLASS, GameText, H, Mono, TOUCH, W} from './race';
+import {Btn, CH, CW, GLASS, GameText, H, Mono, TOUCH, W} from './race';
 import {DT, mmss, money} from './rules';
 import {BUILDERS, KIND, SCAN_S, SITES, blocksOf, canFast, costOf, crackOf, layOf, makeBot, makeBuild, realOf, resultLines, rhythmOf, riskOf, stars, tick, usualOf} from './blocks';
 import type {BEv, Bot, Build, Kind, Site} from './blocks';
@@ -24,7 +24,6 @@ import {Button as Round, INK, Icon, Keys, MUTE, Proof, Sheet, Star, Stars, TAP, 
 import type {IconName} from './ui';
 
 /* ---------- the world: the tower stands on x 0..2, z 0..2, two cubes by two a block ---------- */
-const CW = 1600, CH = 900;   // the canvas draws at this size and is stretched to the stage
 const CELLS: [number, number][] = [[.5, .5], [1.5, .5], [.5, 1.5], [1.5, 1.5]];
 const POLE: [number, number] = [-1.5, .5];   // the ruler: a glass cube per block of the job, and a gold one on top
 const hash = (i: number) => {const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x);};

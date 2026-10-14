@@ -15,7 +15,7 @@ import {Txt} from '../../remotion/src/opus55/chrome';
 import {hash} from '../../remotion/src/opus55/mebvec';
 import type {FP} from '../../remotion/src/opus55/mebvec';
 import {BOLD, MONO, clamp} from '../../remotion/src/meb-hatch/rig';
-import {Btn, GLASS, H, Mono, TOUCH, W} from './race';
+import {Btn, CH, CW, GLASS, H, Mono, TOUCH, W} from './race';
 import {Button, GOLD, Hit, INK, Icon, Keys, MUTE, Proof, Sheet, Star, Stars, TAP, UI, WORLD_BLUR, cap, nm, outline, txt} from './ui';
 import type {IconName} from './ui';
 import {DT, money} from './rules';
@@ -28,7 +28,6 @@ import {Count, Explain, In, Moves, markSeen, seen, useT} from './explain';
 import type {Card} from './explain';
 
 /* ---------- the stage: one fixed camera on the roof ---------- */
-const CW = 1600, CH = 900;   // the canvas draws at this size and is stretched to the stage
 const CAM = {pos: [.3, 1.9, 11.5] as V3, look: [.3, 1.35, 0] as V3, fov: 30};
 const eye = new THREE.PerspectiveCamera(CAM.fov, W / H, .1, 1500), v3 = new THREE.Vector3();
 eye.position.set(...CAM.pos); eye.lookAt(...CAM.look); eye.updateProjectionMatrix(); eye.updateMatrixWorld();
