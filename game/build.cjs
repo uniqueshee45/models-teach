@@ -30,6 +30,7 @@ esbuild.buildSync({...common, entryPoints: ['src/main.tsx'], outfile: path.join(
   target: 'es2020', loader: {'.ttf': 'dataurl'}, define: {'process.env.NODE_ENV': '"production"'}});
 // a new build must never run a browser's cached copy of the old one
 fs.writeFileSync(path.join(dist, 'index.html'), fs.readFileSync(path.join(here, 'index.html'), 'utf8').replace('src="game.js"', `src="game.js?v=${Date.now()}"`));
+for (const f of ['favicon.svg', 'favicon.ico']) fs.copyFileSync(path.join(here, f), path.join(dist, f));   // Meb's head, drawn from mebvec's head layers
 if (hasSfx) for (const n of SOUNDS) fs.copyFileSync(path.join(SFX, n + '.wav'), path.join(dist, 'sfx', n + '.wav'));
 // the video's music for the race, the shop, the map, the arena, the blocks, the court and the ship, as mp3 (each wav is 3 to 4.5 MB);
 // the pre-game themes (bed-select, the arena's; bed-lobby, the ship's; bed-build, the blocks'; bed-morning, the desk's; bed-garage, the rally's; bed-docket, the court's) are the game's own (music.py writes them to channel/game/sfx)
