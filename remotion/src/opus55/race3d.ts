@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
+import {fold} from './fold';
 
 export const LANE = 3.6, RAIL = 8.7, TRACK = 3400, LEN = TRACK + 150;
 export type V3 = [number, number, number];
@@ -36,7 +37,10 @@ export type State = {
 /** What the game (channel/game) swaps in; the video passes none of it and gets the orange OPUS 5.5 car. */
 export type CarBody = 'sports' | 'hatch' | 'gt' | 'classic';
 export type CarLook = {paint: string; plate: string; body?: CarBody};
-export type Opts = {player?: CarLook; ghosts?: CarLook[]; blimp?: {label: string; band: string}; crew?: boolean};   // crew: the pit stop's four tyres
+export type Opts = {player?: CarLook; ghosts?: CarLook[]; blimp?: {label: string; band: string}; crew?: boolean;   // crew: the pit stop's four tyres
+  /** The game, for phones: the same picture from far fewer objects (see fold), nothing drawn at opacity 0, and no kept
+   *  drawing buffer. The video never sets it, so its frames are untouched. */
+  lite?: boolean};
 /** Roof height of each body, for drawing Meb on top. */
 export const ROOF_Y: Record<CarBody, number> = {sports: 1.36, hatch: 1.55, gt: 1.37, classic: 1.67};
 /** The game's pit crew, one at each wheel: hop in from the roadside, work while the tyre comes off and on about once a second, hop out.
@@ -266,7 +270,7 @@ const pickN = (k: number[], t: number) => {const i = Math.min(1, Math.floor(t)),
 
 export function build(canvas: HTMLCanvasElement, spec: Spec, W: number, H: number, opts: Opts = {}) {
   seed = 11;
-  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: !opts.lite});
   renderer.setPixelRatio(1); renderer.setSize(W, H, false); renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(58, W / H, .5, 4000);
   const pm = new THREE.PMREMGenerator(renderer);
@@ -392,6 +396,7 @@ export function build(canvas: HTMLCanvasElement, spec: Spec, W: number, H: numbe
     });
     return {lights, walls};
   });
+  if (opts.lite) {fold(far); gates.forEach(fold);}   // 292 hills, towers and cloud puffs, and 21 parts a gantry
 
   /* cars */
   const player = car(opts.player ?? {paint: '#e3663e', plate: 'OPUS 5.5'}); scene.add(player.g);
@@ -453,6 +458,10 @@ export function build(canvas: HTMLCanvasElement, spec: Spec, W: number, H: numbe
     cloudMat.color.copy(pick(KEY.cloud, t)); cloudMat.emissive.copy(pick(KEY.cloud, t)); cloudMat.emissiveIntensity = pickN([.45, .4, .25], t); cityMat.color.copy(pick(KEY.city, t).lerp(hor, .3));
     const night = Math.max(0, t - 1);
     cityMat.emissiveIntensity = night * .9; poolMat.opacity = night * .55; glowMat.opacity = night * .9;
+    if (opts.lite) {   // 142 lamp glows: none by day, and at dusk only the ones short of the fog's end
+      poolMat.visible = glowMat.visible = night > 0;
+      for (const g of glows) g.visible = -g.position.z < s.car.d + 650;
+    }
     lampHead.color.set(night > .3 ? '#fff0c8' : '#d9dde2');
     (headPool.material as THREE.MeshBasicMaterial).opacity = night * .5;
     TAIL.color.setScalar(1).set('#ff2a2a').multiplyScalar(1 + night * 1.2);
@@ -485,6 +494,7 @@ export function build(canvas: HTMLCanvasElement, spec: Spec, W: number, H: numbe
     laneFx.forEach((fx, i) => {if (!fx) return; const st = s.lanes?.[i];
       for (let j = 0; j < 3; j++) {
         fx.lights[j].opacity = st ? st.light[j] : 0; if (st) fx.lights[j].color.set(st.col[j]);
+        if (opts.lite) fx.lights[j].visible = fx.lights[j].opacity > 0;
         const w = st ? st.wall[j] : 0; fx.walls[j].visible = w > .01; fx.walls[j].scale.set(1, Math.max(.001, w), 1);
       }});
     crew.forEach((tyre, i) => {

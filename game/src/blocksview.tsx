@@ -9,9 +9,9 @@ import * as THREE from 'three';
 import {build} from '../../remotion/src/opus55/blocks3d';
 import type {Bit, Blk as Cube, Rig, V3} from '../../remotion/src/opus55/blocks3d';
 import {Txt} from '../../remotion/src/opus55/chrome';
-import {BOLD, MONO, clamp, lerp, meb, outBack} from '../../remotion/src/meb-hatch/rig';
+import {BOLD, MONO, clamp, lerp, outBack} from '../../remotion/src/meb-hatch/rig';
 import type {Pose} from '../../remotion/src/meb-hatch/rig';
-import {Btn, CH, CW, GLASS, GameText, H, Mono, TOUCH, W} from './race';
+import {Btn, CH, CW, GLASS, GameText, H, Mono, TOUCH, W, mebKept} from './race';
 import {DT, mmss, money} from './rules';
 import {BUILDERS, KIND, SCAN_S, SITES, blocksOf, canFast, costOf, crackOf, layOf, makeBot, makeBuild, realOf, resultLines, rhythmOf, riskOf, stars, tick, usualOf} from './blocks';
 import type {BEv, Bot, Build, Kind, Site} from './blocks';
@@ -87,7 +87,7 @@ function worldOf(g: G) {
   const top = brief ? 0 : g.camY, sh = g.shake > 0 ? (hash(Math.floor(t * 60)) - .5) * g.shake * .5 : 0;
   const cam = brief ? {pos: [13 + Math.sin(t * .2) * 1.5, 5.5, 21] as V3, look: [2.5, 3.2, 0] as V3, fov: 44}
     : {pos: [9.6 + sh, top + 2.3, 16.5] as V3, look: [4.4, top + .1 + sh, 1] as V3, fov: 40};
-  return {f: t * 30, cam, sun: brief ? .2 : sunOf(b), blocks, bits, signs: [], meb: {p: [1, g.mebY, 1] as V3, yaw: .45, grid: meb(poseOf(g))}};
+  return {f: t * 30, cam, sun: brief ? .2 : sunOf(b), blocks, bits, signs: [], meb: {p: [1, g.mebY, 1] as V3, yaw: .45, grid: mebKept(poseOf(g))}};
 }
 
 /* ---------- the cards it opens with (explain.tsx): the tip is Anthropic's, "give Claude a way to check its work", and
@@ -203,7 +203,7 @@ export const Blocks: React.FC<{best: Record<string, number>; onEnd: (key: string
   const [how, setHow] = useState(() => !seen(HOW_KEY)), howOn = useRef(how); howOn.current = how;
 
   useEffect(() => {   // the land is built once and kept across towers
-    rigRef.current = build(canvas.current!, CW, CH, []);
+    rigRef.current = build(canvas.current!, CW, CH, [], true);   // lite: the land from its visible faces only
     return () => {loop('bed-build.mp3', 0); canvas.current?.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();};
   }, []);
 

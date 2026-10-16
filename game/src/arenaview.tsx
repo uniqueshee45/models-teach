@@ -202,7 +202,7 @@ export const Arena: React.FC<{best: Record<string, number>; onEnd: (key: string,
   const again = (pick: boolean) => {brief.current = pick; setRun(r => r + 1);};
 
   useEffect(() => {   // the roof is built once and kept across fights
-    rigRef.current = build(canvas.current!, CW, CH);
+    rigRef.current = build(canvas.current!, CW, CH, true);   // lite: the rooftop folded into a few meshes
     return () => {loop('bed-select.mp3', 0); canvas.current?.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();};
   }, []);
 

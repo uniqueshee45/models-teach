@@ -105,7 +105,7 @@ export const Race: React.FC<{road: Road; pick: ModelId; rivals: ModelId[]; onEnd
     const rig = build(canvas.current!, lay.spec, CW, CH, {
       player: {paint: m.paint, plate: m.name, body: m.body},
       ghosts: rivals.map(id => ({paint: MODELS[id].paint, plate: '', body: MODELS[id].body})),
-      blimp: {label: `${m.name} · THE MODEL`, band: m.paint}, crew: true});
+      blimp: {label: `${m.name} · THE MODEL`, band: m.paint}, crew: true, lite: true});
     ref.current = {g, rig, lay};
     const you = g.you, n = you.n, [nRight, , nWrong] = counts(road, m);
     const pop = (p: Omit<Pop, 't0'>) => g.pops.push({...p, t0: g.clock});
@@ -292,7 +292,9 @@ function stateOf(g: Game, r: Road, body: keyof typeof ROOF_Y, lay: Layout): Stat
     traffic: [],
     coins: [...Array(COINS)].map((_, i) => {const c = g.coins[i], u = c ? (g.clock - c.t0) / .7 : 2;
       return !c || u >= 1 ? NO_COIN : {x: c.x + (hash(i) - .5) * 2.4 * u, d: c.d - 2.9 - u * 1.5, y: .5 + Math.sin(u * Math.PI) * 1.5, spin: g.clock * 9 + i, s: 1 - u * u};}),
-    gates: lay.spec.gates.map(() => ({s: 1, flash: 0})),
+    // a gantry is 21 meshes and the road is straight, so every one of them was in view: draw only those between just
+    // behind the car and the end of the fog (600 m at the latest), where it is the fog's own colour anyway
+    gates: lay.spec.gates.map(gt => ({s: gt.d > pd - 40 && gt.d < pd + 650 ? 1 : 0, flash: 0})),
     lanes: lanesOf(g, r, lay),
     pit: inPit ? {x, d: pd, t: pit - s.left, dur: pit} : null,
     beams: g.beams.map(t0 => ({from: [x, ROOF_Y[body] + .3, -pd] as V3, p: (g.clock - t0) / .87})).filter(b => b.p >= 0 && b.p <= 1),
@@ -324,6 +326,19 @@ function crewPx(pose: Pose): Grid {
   return px;
 }
 
+/** A pose's pixels, kept: drawing Meb is 1,600 shape tests and the race draws up to five of him every frame, which was
+ *  a quarter of the frame. Arms are rounded to 5° (a hand moves under a pixel) and a hop to a quarter pixel. */
+const grids = new Map<string, Grid>();
+const kept = (draw: (p: Pose) => Grid, tag: string) => (p: Pose): Grid => {
+  const q = {...p, armL: Math.round((p.armL ?? 0) / 5) * 5, armR: Math.round((p.armR ?? 0) / 5) * 5, ...(p.lift ? {lift: Math.round(p.lift * 4) / 4} : {})};
+  const k = tag + JSON.stringify(q);
+  let px = grids.get(k);
+  if (!px) {if (grids.size > 3000) grids.clear(); grids.set(k, px = draw(q));}   // ponytail: a full clear, not LRU; a race uses a few hundred poses
+  return px;
+};
+export const mebKept = kept(meb, 'meb');
+const crewKept = kept(crewPx, 'crew');
+
 /* ---------- the HUD ---------- */
 const v3 = new THREE.Vector3();
 export const Mono: React.FC<{size: number; color?: string; children: React.ReactNode; style?: React.CSSProperties}> = ({size, color = '#fff', children, style}) =>
@@ -347,7 +362,7 @@ const Hud: React.FC<{g: Game; road: Road; rig: Rig; pick: ModelId; setNitro: (v:
     if (!pitS) return null;
     const w = crewAt(pitS, i), q = project(w.pos), sc = (q.y - project([w.pos[0], w.pos[1] + 1.3, w.pos[2]]).y) / 34;
     if (!q.ok || sc < .3) return null;
-    const px = crewPx(w.work ? {face: 'side', armL: 15, armR: 66 + Math.sin(t * 34 + i * 2) * 22} : {face: 'happy', armL: Math.sin(t * 24 + i) * 45, armR: 45 + Math.sin(t * 24 + i) * 25});
+    const px = crewKept(w.work ? {face: 'side', armL: 15, armR: 66 + Math.sin(t * 34 + i * 2) * 22} : {face: 'happy', armL: Math.sin(t * 24 + i) * 45, armR: 45 + Math.sin(t * 24 + i) * 25});
     const ground = project([w.pos[0], 0, w.pos[2]]);
     return <React.Fragment key={i}>
       <Shadow x={ground.x - 20 * sc} y={ground.y - 38 * sc} scale={sc}/>
@@ -389,7 +404,7 @@ const Hud: React.FC<{g: Game; road: Road; rig: Rig; pick: ModelId; setNitro: (v:
     {CREW.map(([sx], i) => sx < 0 ? crewMeb(i) : null)}
     {/* Meb */}
     {mp.ok && ms > .3 && <div style={{position: 'absolute', left: 0, top: 0, transform: `translate(${mp.x - 20 * ms}px, ${mp.y - 38 * ms}px) rotate(${g.nitroVis * -10}deg)`, transformOrigin: `${20 * ms}px ${38 * ms}px`}}>
-      <Px px={meb({face, ...arms})} x={0} y={0} scale={ms} pal={PAL}/></div>}
+      <Px px={mebKept({face, ...arms})} x={0} y={0} scale={ms} pal={PAL}/></div>}
     {CREW.map(([sx], i) => sx > 0 ? crewMeb(i) : null)}
     {/* the co-driver's call for the fork ahead */}
     {bubble && mp.ok && <div style={{position: 'absolute', left: mp.x, top: mp.y - 44 * ms, transform: 'translate(-50%, -100%)', textAlign: 'center', padding: '8px 22px', ...GLASS, borderRadius: 18, borderColor: bubble.c}}>

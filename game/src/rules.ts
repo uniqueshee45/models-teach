@@ -217,6 +217,9 @@ export type Style = 'trust' | 'smart' | 'careful';
 export function botInput(s: Sim, style: Style, fast = false): Input {
   const r = s.road, k = s.k;
   if (s.phase !== 'drive' || k >= s.n) return {lane: s.lane, brake: false, nitro: fast};
+  // past a fork, it keeps its lane until the back of the car is clear of the walls: steering at once slid it sideways
+  // through them (the user, 2026-10-14: "wait for the whole car model get pass the wall, then change lane later")
+  if (k > 0 && s.d < wallD(r, k - 1) + NOSE + 1) return {lane: s.lane, brake: false, nitro: fast};
   const p = s.plan, top = topOf(r, s.m), dist = wallD(r, k) - NOSE - s.d, rev = revealOf(r, s.m), seen = dist <= rev;
   const look = p.calls[k] === 'ask' || style === 'careful' || (style === 'smart' && p.hard[k] >= (r.id === 'tickets' ? 2 : 3));
   if (!look) return {lane: p.lit[k]!, brake: false, nitro: fast};

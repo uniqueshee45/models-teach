@@ -139,10 +139,34 @@ function heightAt(x: number, z: number) {
   return Math.min(h, 24);
 }
 
+/** `lite` (the game, for phones): the land as one mesh a kind, made of only the cube faces that touch air and face
+ *  up or sideways. Instanced cubes drew all six faces of 44,000 cubes, 535,000 triangles a frame. A face pressed
+ *  against another cube, or facing down into the ground, is never on screen; every other face keeps the box's own
+ *  corners, normals, UVs and material, so the picture is the same. */
+function shell(list: V3[], solid: Set<string>) {
+  const box = new THREE.BoxGeometry(1, 1, 1), P = box.attributes.position, U = box.attributes.uv, I = box.index!;
+  const pos: number[] = [], nor: number[] = [], uv: number[] = [], idx: number[] = [], geo = new THREE.BufferGeometry();
+  for (const g of box.groups) {   // one group per face, in the box's order, so grass still gets its top, sides and bottom
+    const start = idx.length, tri = [...Array(g.count)].map((_, i) => I.getX(g.start + i)), vs = [...new Set(tri)];
+    const n = [box.attributes.normal.getX(vs[0]), box.attributes.normal.getY(vs[0]), box.attributes.normal.getZ(vs[0])];
+    if (n[1] < 0) continue;
+    for (const [x, y, z] of list) {
+      if (solid.has(`${x + n[0]},${y + n[1]},${z + n[2]}`)) continue;
+      const base = pos.length / 3;
+      for (const v of vs) {pos.push(P.getX(v) + x + .5, P.getY(v) + y + .5, P.getZ(v) + z + .5); nor.push(...n); uv.push(U.getX(v), U.getY(v));}
+      for (const t of tri) idx.push(base + vs.indexOf(t));
+    }
+    geo.addGroup(start, idx.length - start, g.materialIndex);
+  }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
+  return geo;
+}
+
 export type Rig = ReturnType<typeof build>;
-export function build(canvas: HTMLCanvasElement, W: number, H: number, signs: Sign[]) {
+export function build(canvas: HTMLCanvasElement, W: number, H: number, signs: Sign[], lite = false) {
   seed = 3;
-  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: !lite});
   renderer.setPixelRatio(1); renderer.setSize(W, H, false); renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(60, W / H, .1, 900);
   scene.fog = new THREE.Fog('#b8d8ff', 45, 125);
@@ -184,7 +208,9 @@ export function build(canvas: HTMLCanvasElement, W: number, H: number, signs: Si
   }
   leafSet.forEach(s => {const [x, z, j] = s.split(',').map(Number); cells.leaves.push([x, j, z]);});
   const o = new THREE.Object3D();
+  const solid = lite ? new Set(Object.values(cells).flat().map(([x, y, z]) => `${x},${y},${z}`)) : null;
   for (const [kind, list] of Object.entries(cells)) {
+    if (solid) {scene.add(new THREE.Mesh(shell(list, solid), (M as any)[kind])); continue;}
     const im = new THREE.InstancedMesh(cube, (M as any)[kind], Math.max(1, list.length));
     list.forEach(([x, y, z], i) => {o.position.set(x + .5, y + .5, z + .5); o.rotation.set(0, 0, 0); o.scale.setScalar(1); o.updateMatrix(); im.setMatrixAt(i, o.matrix);});
     im.frustumCulled = false; scene.add(im);

@@ -5,6 +5,7 @@
  * One unit = one metre; the floor of both stages is y = 0 and the fighters stand on z = 0.
  */
 import * as THREE from 'three';
+import {fold} from './fold';
 
 export type V3 = [number, number, number];
 export type Set = 'train' | 'roof';
@@ -71,9 +72,12 @@ const neonTex = () => canvasTex(512, 256, c => {  // a billboard: a lightning bo
 });
 
 export type Rig = ReturnType<typeof build>;
-export function build(canvas: HTMLCanvasElement, W: number, H: number) {
+/** `lite` (the game, for phones): the towers share one material a tint, with their window tiling written into their
+ *  UVs instead of a texture copy each, then every still part of the roof that shares a material is folded into one
+ *  mesh. 100 draw calls become about 30; the picture is the same. */
+export function build(canvas: HTMLCanvasElement, W: number, H: number, lite = false) {
   seed = 11;
-  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: !lite});
   renderer.setPixelRatio(1); renderer.setSize(W, H, false); renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(30, W / H, .1, 1500);
   const train = new THREE.Group(), roof = new THREE.Group();
@@ -128,11 +132,20 @@ export function build(canvas: HTMLCanvasElement, W: number, H: number) {
     m.position.set(x, y, z); roof.add(m); clouds.push(m);
   });
   // the city: three rows of towers, the ground far below (y = -60), windows lit
-  const wT = windowTex(), wG = glowOnly(wT);
+  const wT = windowTex(), wG = glowOnly(wT), tints = new Map<string, THREE.Material>();
   const tower = (x: number, z: number, w: number, d: number, top: number, tint: string) => {
-    const h = top + 60, map = wT.clone(), em = wG.clone();
-    map.repeat.set(Math.max(1, Math.round(w / 8)), h / 16); em.repeat.copy(map.repeat); map.needsUpdate = em.needsUpdate = true;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lam({map, emissive: '#ffffff', emissiveMap: em, emissiveIntensity: 1.1, color: tint}));
+    const h = top + 60, rx = Math.max(1, Math.round(w / 8)), ry = h / 16, geo = new THREE.BoxGeometry(w, h, d);
+    let mat: THREE.Material;
+    if (lite) {
+      const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * rx, uv.getY(i) * ry);
+      if (!tints.has(tint)) tints.set(tint, lam({map: wT, emissive: '#ffffff', emissiveMap: wG, emissiveIntensity: 1.1, color: tint}));
+      mat = tints.get(tint)!;
+    } else {
+      const map = wT.clone(), em = wG.clone();
+      map.repeat.set(rx, ry); em.repeat.copy(map.repeat); map.needsUpdate = em.needsUpdate = true;
+      mat = lam({map, emissive: '#ffffff', emissiveMap: em, emissiveIntensity: 1.1, color: tint});
+    }
+    const m = new THREE.Mesh(geo, mat);
     m.position.set(x, top - h / 2, z); roof.add(m);
   };
   for (let i = 0; i < 80; i++) tower(-420 + rnd() * 840, -330 + rnd() * 80, 10 + rnd() * 18, 12, -12 + rnd() * rnd() * 70, '#b8a6d8');
@@ -171,6 +184,7 @@ export function build(canvas: HTMLCanvasElement, W: number, H: number) {
   const sunL = new THREE.DirectionalLight('#ffb070', 1.6); sunL.position.copy(SUN).multiplyScalar(100); roof.add(sunL, sunL.target);
   const fill = new THREE.DirectionalLight('#9a8cff', .55); fill.position.set(3, 6, 12); roof.add(fill, fill.target);
 
+  if (lite) {fold(roof); fold(train);}   // clouds, the lamp and the dome each have their own material, so they still move
   const FOG = {roof: new THREE.Fog('#c2667a', 70, 520), train: new THREE.Fog('#dfe5ee', 18, 60)};
   const cloudX = clouds.map(c => c.position.x);
   function render(s: State) {

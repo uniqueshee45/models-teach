@@ -130,6 +130,20 @@ const WORLDS = [
 ];
 const CAM = {cx: 1550, cy: 800, z: .62};
 const mebSpot = (n: number): [number, number] => [NODES[n][0] + (n % 2 ? -190 : 190), NODES[n][1] + 70];   // the side its flag isn't on
+/* The map's still parts are drawn once and the waves 15 times a second (a wave moves under a pixel in that time):
+ * redrawing all of it every frame took a slowed phone down to 7 frames a second on this screen. */
+const [ICX, ICY, IA, IB, IN, ISEED] = ISLES[0];
+const RING = blob(ICX, ICY, IA, IB, IN, 70, ISEED);
+const Waves = React.memo<{q: number}>(({q}) => <>{[...Array(160)].map((_, k) => {
+  const x = -1400 + (k % 16) * 440 + (Math.floor(k / 16) % 2) * 220 + Math.sin(q * 2 / 22 + k) * 14, y = -900 + Math.floor(k / 16) * 330;
+  return <path key={k} d={`M${(x - 34).toFixed(1)} ${y} Q${x.toFixed(1)} ${y - 16} ${(x + 34).toFixed(1)} ${y}`} stroke={C.wave} strokeWidth={7} fill="none" strokeLinecap="round"/>;})}</>);
+const Island = React.memo(() => <>
+  <path d={blob(ICX, ICY, IA, IB, IN, 45, ISEED)} fill={C.sand} stroke="#2A2540" strokeWidth={6}/>
+  <path d={blob(ICX, ICY, IA, IB, IN, 0, ISEED)} fill={C.grass}/>
+  {TREES.slice(0, 3).map(([x, y], k) => <Tree key={k} x={x} y={y}/>)}
+  {MAIN_DOTS.map(([x, y], k) => <circle key={k} cx={x} cy={y} r={11} fill="#fff6d8" stroke="#2A2540" strokeWidth={3}/>)}</>);
+const Spot = React.memo<{n: number; open: boolean}>(({n, open}) => {const [x, y] = NODES[n];
+  return <g style={open ? undefined : {filter: 'grayscale(1) contrast(.55) brightness(1.25)'}}><Platform x={x} y={y}/><Diorama i={n} x={x} y={y}/></g>;});
 const Worlds: React.FC<{at: number; stars: ([number, number] | undefined)[]; go: (i: number) => void}> = ({at, stars, go}) => {
   const t = useClock(), [i, setI] = useState(at), hop = useRef({x: mebSpot(at)[0], y: mebSpot(at)[1], t0: -9});
   const u = clamp((t - hop.current.t0) / .45), [tx, ty] = mebSpot(i), mx = lerp(hop.current.x, tx, inOut(u)), my = lerp(hop.current.y, ty, inOut(u));
@@ -137,22 +151,18 @@ const Worlds: React.FC<{at: number; stars: ([number, number] | undefined)[]; go:
   const play = (n: number) => {if (WORLDS[n].open) {sfx('blip', .4); go(n);} else sfx('buzz', .25);};
   useKeys(k => {if (k === 'arrowleft') move(Math.max(0, i - 1)); if (k === 'arrowright') move(Math.min(WORLDS.length - 1, i + 1)); if (k === 'enter' || k === ' ') play(i);});
   useEffect(() => {loop('bed-map.mp3', .09); return () => loop('bed-map.mp3', 0);}, []);
-  const w = WORLDS[i], st = stars[i], f = t * 30, [cx, cy, a, b, n4, seed] = ISLES[0];
+  const w = WORLDS[i], st = stars[i], f = t * 30;
   return <div style={{position: 'absolute', inset: 0, background: C.sea}}>
     <svg width={W} height={H} style={{position: 'absolute', inset: 0}}>
       <g transform={`translate(${W / 2} ${H / 2 + 30}) scale(${CAM.z}) translate(${-CAM.cx} ${-CAM.cy})`}>
         <rect x={-3000} y={-3000} width={9000} height={8000} fill={C.sea}/>
-        {[...Array(160)].map((_, k) => {const x = -1400 + (k % 16) * 440 + (Math.floor(k / 16) % 2) * 220 + Math.sin(f / 22 + k) * 14, y = -900 + Math.floor(k / 16) * 330;
-          return <path key={k} d={`M${(x - 34).toFixed(1)} ${y} Q${x.toFixed(1)} ${y - 16} ${(x + 34).toFixed(1)} ${y}`} stroke={C.wave} strokeWidth={7} fill="none" strokeLinecap="round"/>;})}
-        <path d={blob(cx, cy, a, b, n4, 70, seed)} fill="none" stroke="#fff" strokeWidth={10} opacity={.45 + .15 * Math.sin(f / 12)}/>
-        <path d={blob(cx, cy, a, b, n4, 45, seed)} fill={C.sand} stroke="#2A2540" strokeWidth={6}/>
-        <path d={blob(cx, cy, a, b, n4, 0, seed)} fill={C.grass}/>
-        {TREES.slice(0, 3).map(([x, y], k) => <Tree key={k} x={x} y={y}/>)}
-        {MAIN_DOTS.map(([x, y], k) => <circle key={k} cx={x} cy={y} r={11} fill="#fff6d8" stroke="#2A2540" strokeWidth={3}/>)}
+        <Waves q={Math.floor(f / 2)}/>
+        <path d={RING} fill="none" stroke="#fff" strokeWidth={10} opacity={.45 + .15 * Math.sin(f / 12)}/>
+        <Island/>
         {[1, 3, 5, 0, 2, 4].map(n => {const [x, y] = NODES[n], wd = WORLDS[n], on = n === i, sn = stars[n], all = sn && sn[0] === sn[1];   // back row first
           return <g key={n} onPointerEnter={TOUCH ? undefined : () => move(n)} onClick={() => {if (on || !TOUCH) play(n); else move(n);}} style={{cursor: 'pointer'}}>
             {on && <ellipse cx={x} cy={y + 14} rx={198} ry={82} fill="none" stroke="#fff" strokeWidth={9} strokeDasharray="30 20" strokeDashoffset={-t * 40}/>}
-            <g style={wd.open ? undefined : {filter: 'grayscale(1) contrast(.55) brightness(1.25)'}}><Platform x={x} y={y}/><Diorama i={n} x={x} y={y}/></g>
+            <Spot n={n} open={!!wd.open}/>
             {wd.open && <Flag x={x + (n % 2 ? 125 : -125)} y={y + 5} u={1} f={f} i={n} left={n % 2 === 0} s={all ? 'CLEAR' : 'PLAY'}/>}
             <Plate x={x} y={y + (n % 2 ? 170 : 150)} s={wd.open ? wd.name : 'SOON'} u={1}/>
             <ellipse cx={x} cy={y - 60} rx={200} ry={250} fill="transparent"/>
